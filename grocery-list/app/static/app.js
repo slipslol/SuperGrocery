@@ -73,25 +73,22 @@ const ITEM_EMOJI = {
   'tissues':'🤧','trash bags':'🗑️',
 };
 
-// ── State ────────────────────────────────────────────────────
+// ── State
 let allItems = [];
-let mode = 'building'; // 'building' | 'shopping' | 'done'
-let storeSheetContext = 'filter'; // 'filter' | 'start'
-let shoppingStore = 'all';
-let storeFilter = 'all';
-let activeTab = 'browse';
+let mode = 'building'; // 'building' | 'reviewing' | 'shopping' | 'done'
 let searchQuery = '';
 let browseFilter = 'all';
 let editingItem = null;
 let toastTimer = null;
+let krogerEnabled = false;
+let priceCache = {}; // { [id]: {price, promo, loading, failed} }
+let priceFetchActive = false;
 
-// ── Derived ──────────────────────────────────────────────────
+// ── Derived
 const listItems = () => allItems.filter(i => i.in_list);
-const unchecked = () => listItems().filter(i => !i.checked).length;
 
 function visibleItems() {
   let items = allItems;
-  if (storeFilter !== 'all') items = items.filter(i => !i.store || i.store === storeFilter);
   if (browseFilter !== 'all') items = items.filter(i => i.category === browseFilter);
   const q = searchQuery.trim().toLowerCase();
   if (q) items = items.filter(i => i.name.toLowerCase().includes(q));
@@ -110,7 +107,9 @@ function qtyLabel(item) {
   return '';
 }
 
-// ── API ──────────────────────────────────────────────────────
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── API
 async function api(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
@@ -125,79 +124,81 @@ async function api(method, path, body) {
 async function loadAll() {
   try {
     allItems = await api('GET', '/api/items');
-    render();
+    syncPriceCacheFromItems();
+    renderBrowse();
+    updateCTA();
   } catch (e) {
     toast(`Failed to load: ${e.message}`);
   }
 }
 
-// ── Mode machine ─────────────────────────────────────────────
+function syncPriceCacheFromItems() {
+  for (const item of allItems) {
+    if (item.kroger_price != null && priceCache[item.id] === undefined) {
+      priceCache[item.id] = {
+        price: item.kroger_price,
+        promo: item.kroger_promo,
+        loading: false,
+        failed: false,
+      };
+    }
+  }
+}
+
+async function initKrogerStatus() {
+  try {
+    const st = await api('GET', '/api/kroger/status');
+    krogerEnabled = !!(st && st.enabled);
+  } catch {
+    krogerEnabled = false;
+  }
+}
+
+// ── Mode machine
 function setMode(newMode) {
   mode = newMode;
-  const barBuild = document.getElementById('barBuild');
-  const barShop  = document.getElementById('barShop');
-  const buildEl  = document.getElementById('buildMode');
-  const shopEl   = document.getElementById('shopMode');
-  const doneEl   = document.getElementById('doneMode');
 
-  barBuild.classList.toggle('hidden', newMode !== 'building');
-  barShop.classList.toggle('hidden', newMode === 'building');
+  document.getElementById('barBuild').classList.toggle('hidden', newMode !== 'building');
+  document.getElementById('barReview').classList.toggle('hidden', newMode !== 'reviewing');
+  document.getElementById('barShop').classList.toggle('hidden', newMode !== 'shopping');
 
-  buildEl.classList.toggle('active',      newMode === 'building');
-  buildEl.classList.toggle('slide-right', newMode !== 'building');
-  shopEl.classList.toggle('active',       newMode === 'shopping');
-  shopEl.classList.toggle('slide-right',  newMode !== 'shopping');
-  doneEl.classList.toggle('active',       newMode === 'done');
-  doneEl.classList.toggle('slide-right',  newMode !== 'done');
+  const modeMap = {building:'buildMode', reviewing:'reviewMode', shopping:'shopMode', done:'doneMode'};
+  Object.entries(modeMap).forEach(([m, id]) => {
+    const el = document.getElementById(id);
+    el.classList.toggle('active', m === newMode);
+    el.classList.toggle('slide-right', m !== newMode);
+  });
 
-  if (newMode === 'shopping') {
-    document.getElementById('shopStoreName').textContent =
-      shoppingStore !== 'all' ? shoppingStore : 'Shopping';
+  if (newMode === 'reviewing') {
+    renderReview();
+    if (krogerEnabled) fetchPricesForList();
+  } else if (newMode === 'shopping') {
     renderShop();
   } else if (newMode === 'done') {
     showDoneScreen();
     celebrate();
   } else if (newMode === 'building') {
     updateCTA();
-    render();
+    renderBrowse();
   }
 }
 
 function showDoneScreen() {
   const items = listItems();
   const checked = items.filter(i => i.checked).length;
-  const storePart = shoppingStore !== 'all' ? ` from ${shoppingStore}` : '';
   document.getElementById('doneSub').textContent = checked === items.length
-    ? `You picked up all ${items.length} item${items.length !== 1 ? 's' : ''}${storePart} 🎉`
-    : `${checked} of ${items.length} item${items.length !== 1 ? 's' : ''} picked up${storePart}`;
+    ? `You picked up all ${items.length} item${items.length !== 1 ? 's' : ''} 🎉`
+    : `${checked} of ${items.length} item${items.length !== 1 ? 's' : ''} picked up`;
 }
 
-// ── Render ───────────────────────────────────────────────────
-function render() {
-  updateBadge();
-  updateCTA();
-  if (mode === 'building') {
-    if (activeTab === 'browse' || isDesktop()) renderBrowse();
-    if (activeTab === 'list'   || isDesktop()) renderList();
-  } else if (mode === 'shopping') {
-    renderShop();
-  }
-}
-
-function isDesktop() { return window.innerWidth >= 1024; }
-
-function updateBadge() {
-  const n = listItems().length;
-  document.getElementById('badge').textContent = n > 0 ? n : '';
-}
-
+// ── CTA
 function updateCTA() {
   const n = listItems().length;
   document.getElementById('ctaCount').textContent = `${n} item${n !== 1 ? 's' : ''}`;
   document.getElementById('ctaFloat').classList.toggle('visible', n > 0 && mode === 'building');
 }
 
-// ── Browse view ──────────────────────────────────────────────
+// ── Browse
 function renderBrowse() {
   const container = document.getElementById('browseList');
   const items = visibleItems();
@@ -256,7 +257,6 @@ function browseRow(item) {
   const meta = [
     qty ? `<span class="browse-qty">${esc(qty)}</span>` : '',
     item.notes ? `<span class="browse-notes">${esc(item.notes)}</span>` : '',
-    item.store ? `<span class="browse-store-tag">${esc(item.store)}</span>` : '',
   ].filter(Boolean).join('');
 
   el.innerHTML = `
@@ -277,27 +277,21 @@ function browseRow(item) {
   return el;
 }
 
-// ── List view ────────────────────────────────────────────────
-function renderList() {
-  const container = document.getElementById('shoppingList');
-  const empty = document.getElementById('emptyList');
+// ── Review
+function renderReview() {
+  const container = document.getElementById('reviewList');
   const items = listItems();
 
-  const summary = document.getElementById('listSummary');
-  const done = items.filter(i => i.checked).length;
-  summary.textContent = items.length === 0 ? '0 items'
-    : done > 0 ? `${items.length - done} left · ${done} done`
-    : `${items.length} item${items.length !== 1 ? 's' : ''}`;
+  document.getElementById('reviewTitle').textContent = `Your List (${items.length})`;
 
   if (!items.length) {
-    container.innerHTML = '';
-    container.appendChild(empty);
+    container.innerHTML = `<div class="empty-list"><div class="empty-emoji">🛒</div><p>Nothing added yet</p><span>Go back and add items</span></div>`;
+    updateReviewTotal();
     return;
   }
 
   const frag = document.createDocumentFragment();
   const cats = CAT_ORDER.filter(c => items.some(i => i.category === c));
-
   cats.forEach(cat => {
     const catItems = items.filter(i => i.category === cat);
     const group = document.createElement('div');
@@ -306,62 +300,165 @@ function renderList() {
       <div class="cat-hdr">
         <div class="cat-dot" style="background:${CAT_COLOR[cat]}"></div>
         <span class="cat-hdr-name">${cat}</span>
-        <span class="cat-hdr-count">${catItems.filter(i=>!i.checked).length}/${catItems.length}</span>
+        <span class="cat-hdr-count">${catItems.length}</span>
       </div>`;
-    [...catItems].sort((a,b) => a.checked - b.checked).forEach(item => {
-      group.appendChild(listRow(item));
-    });
+    catItems.forEach(item => group.appendChild(reviewRow(item)));
     frag.appendChild(group);
   });
 
   container.innerHTML = '';
   container.appendChild(frag);
+  updateReviewTotal();
 }
 
-function listRow(item) {
+function reviewRow(item) {
   const el = document.createElement('div');
-  el.className = 'list-item' + (item.checked ? ' checked' : '');
+  el.className = 'review-item';
   el.dataset.id = item.id;
 
-  const qty = qtyLabel(item);
-  const meta = [
-    qty ? `<span class="list-qty">${esc(qty)}</span>` : '',
-    item.notes ? `<span class="list-notes">${esc(item.notes)}</span>` : '',
-    item.store ? `<span class="list-store-tag">${esc(item.store)}</span>` : '',
-  ].filter(Boolean).join('');
+  const qty = item.quantity || '1';
 
   el.innerHTML = `
-    <div class="list-check" role="checkbox" aria-checked="${!!item.checked}" tabindex="0"></div>
-    <span class="list-emoji">${getEmoji(item)}</span>
-    <div class="list-body">
-      <div class="list-name">${esc(item.name)}</div>
-      ${meta ? `<div class="list-meta">${meta}</div>` : ''}
-    </div>
-    <div class="list-actions">
-      <button class="list-btn edit" aria-label="Edit">
-        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-      </button>
-      <button class="list-btn remove" aria-label="Remove">
+    <div class="review-top">
+      <span class="review-emoji">${getEmoji(item)}</span>
+      <div class="review-body">
+        <div class="review-name">${esc(item.name)}</div>
+      </div>
+      <div class="review-price" data-price-id="${item.id}">${renderPriceBadge(item.id)}</div>
+      <button class="review-remove" type="button" aria-label="Remove">
         <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
       </button>
+    </div>
+    <div class="review-controls">
+      <div class="qty-stepper">
+        <button class="qty-btn qty-dec" type="button">−</button>
+        <input class="qty-field" type="text" inputmode="decimal" value="${esc(qty)}" aria-label="Quantity">
+        <button class="qty-btn qty-inc" type="button">+</button>
+        ${item.unit ? `<span class="qty-unit">${esc(item.unit)}</span>` : ''}
+      </div>
+      <input class="review-notes-input" type="text" placeholder="Notes (brand, size…)" value="${esc(item.notes || '')}">
     </div>`;
 
-  el.querySelector('.list-check').addEventListener('click', () => toggleCheck(item));
-  el.querySelector('.list-check').addEventListener('keydown', e => {
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleCheck(item); }
-  });
-  el.querySelector('.edit').addEventListener('click', () => openEdit(item));
-  el.querySelector('.remove').addEventListener('click', () => removeFromList(item));
+  el.querySelector('.qty-dec').addEventListener('click', () => adjustQty(item, -1, el));
+  el.querySelector('.qty-inc').addEventListener('click', () => adjustQty(item, +1, el));
+  el.querySelector('.qty-field').addEventListener('change', e => saveQty(item, e.target.value));
+  el.querySelector('.review-notes-input').addEventListener('change', e => saveNotes(item, e.target.value));
+  el.querySelector('.review-remove').addEventListener('click', () => removeFromReview(item, el));
 
   return el;
 }
 
-// ── Shop view ────────────────────────────────────────────────
+function renderPriceBadge(itemId) {
+  if (!krogerEnabled) return '';
+  const c = priceCache[itemId];
+  if (!c || c.loading) return '<span class="price-badge loading">…</span>';
+  if (c.failed || c.price == null) return '<span class="price-badge unknown">—</span>';
+  const p = (c.promo && c.promo < c.price) ? c.promo : c.price;
+  return `<span class="price-badge">~$${p.toFixed(2)}</span>`;
+}
+
+function refreshPriceDisplay(itemId) {
+  const el = document.querySelector(`[data-price-id="${itemId}"]`);
+  if (el) el.innerHTML = renderPriceBadge(itemId);
+}
+
+async function fetchPricesForList() {
+  if (priceFetchActive) return;
+  priceFetchActive = true;
+  try {
+    const items = listItems();
+    for (const item of items) {
+      const cached = priceCache[item.id];
+      if (cached && !cached.loading && !cached.failed && cached.price != null) continue;
+      priceCache[item.id] = { loading: true, failed: false, price: null, promo: null };
+      refreshPriceDisplay(item.id);
+      try {
+        const data = await api('GET', `/api/items/${item.id}/price`);
+        priceCache[item.id] = {
+          price: data.kroger_price,
+          promo: data.kroger_promo,
+          loading: false,
+          failed: false,
+        };
+      } catch {
+        priceCache[item.id] = { price: null, promo: null, loading: false, failed: true };
+      }
+      refreshPriceDisplay(item.id);
+      updateReviewTotal();
+      await sleep(350);
+    }
+  } finally {
+    priceFetchActive = false;
+  }
+}
+
+function calcTotal(items) {
+  let total = 0, count = 0;
+  for (const item of items) {
+    const c = priceCache[item.id];
+    if (c && !c.loading && !c.failed && c.price != null) {
+      const qty = Math.max(1, parseFloat(item.quantity) || 1);
+      const p = (c.promo && c.promo < c.price) ? c.promo : c.price;
+      total += p * qty;
+      count++;
+    }
+  }
+  return count > 0 ? total : null;
+}
+
+function updateReviewTotal() {
+  const total = calcTotal(listItems());
+  const el = document.getElementById('reviewTotalAmt');
+  if (el) el.textContent = total !== null ? `~$${total.toFixed(2)}` : '—';
+}
+
+function updateShopTotal() {
+  const total = calcTotal(listItems());
+  const el = document.getElementById('shopTotalAmt');
+  if (el) el.textContent = total !== null ? `~$${total.toFixed(2)}` : '—';
+}
+
+async function adjustQty(item, delta, rowEl) {
+  const cur = parseFloat(item.quantity) || 1;
+  const next = Math.max(1, Math.round((cur + delta) * 100) / 100);
+  item.quantity = String(next);
+  const field = rowEl.querySelector('.qty-field');
+  if (field) field.value = next;
+  updateReviewTotal();
+  try { await api('PUT', `/api/items/${item.id}`, {quantity: item.quantity}); }
+  catch { toast('Save failed'); }
+}
+
+async function saveQty(item, val) {
+  const n = parseFloat(val);
+  item.quantity = isNaN(n) || n < 0.01 ? '1' : String(n);
+  updateReviewTotal();
+  try { await api('PUT', `/api/items/${item.id}`, {quantity: item.quantity}); }
+  catch { toast('Save failed'); }
+}
+
+async function saveNotes(item, val) {
+  item.notes = val.trim();
+  try { await api('PUT', `/api/items/${item.id}`, {notes: item.notes}); }
+  catch { toast('Save failed'); }
+}
+
+async function removeFromReview(item, rowEl) {
+  item.in_list = 0;
+  item.checked = 0;
+  rowEl.remove();
+  document.getElementById('reviewTitle').textContent = `Your List (${listItems().length})`;
+  updateReviewTotal();
+  try { await api('PUT', `/api/items/${item.id}`, {in_list: 0, checked: 0}); }
+  catch { await loadAll(); }
+}
+
+// ── Shop
 function renderShop() {
   const container = document.getElementById('shopList');
   const items = listItems();
-
   updateProgress();
+  updateShopTotal();
 
   if (!items.length) {
     container.innerHTML = '<div class="empty-list"><div class="empty-emoji">🛒</div><p>List is empty</p></div>';
@@ -370,7 +467,6 @@ function renderShop() {
 
   const frag = document.createDocumentFragment();
   const cats = CAT_ORDER.filter(c => items.some(i => i.category === c));
-
   cats.forEach(cat => {
     const catItems = items.filter(i => i.category === cat);
     const group = document.createElement('div');
@@ -397,17 +493,25 @@ function shopRow(item) {
   el.dataset.id = item.id;
 
   const qty = qtyLabel(item);
-  const meta = [
+  const c = priceCache[item.id];
+  let priceHtml = '';
+  if (krogerEnabled && c && !c.loading && !c.failed && c.price != null) {
+    const p = (c.promo && c.promo < c.price) ? c.promo : c.price;
+    priceHtml = `<span class="shop-price">~$${p.toFixed(2)}</span>`;
+  }
+
+  const metaParts = [
     qty ? `<span class="shop-qty">${esc(qty)}</span>` : '',
     item.notes ? `<span class="shop-notes">${esc(item.notes)}</span>` : '',
-  ].filter(Boolean).join('');
+    priceHtml,
+  ].filter(Boolean);
 
   el.innerHTML = `
     <div class="shop-check"></div>
     <span class="shop-emoji">${getEmoji(item)}</span>
     <div class="shop-body">
       <div class="shop-name">${esc(item.name)}</div>
-      ${meta ? `<div class="shop-meta">${meta}</div>` : ''}
+      ${metaParts.length ? `<div class="shop-meta">${metaParts.join('')}</div>` : ''}
     </div>`;
 
   el.addEventListener('click', () => toggleShopCheck(item));
@@ -419,19 +523,16 @@ function updateProgress() {
   const total = items.length;
   const done = items.filter(i => i.checked).length;
   const pct = total ? (done / total) * 100 : 0;
-
   document.getElementById('progressFill').style.width = `${pct}%`;
   document.getElementById('progressText').textContent = `${done} / ${total}`;
-
   if (total > 0 && done === total && mode === 'shopping') {
     setTimeout(() => setMode('done'), 700);
   }
 }
 
-// ── Actions ──────────────────────────────────────────────────
+// ── Actions
 async function toggleShopCheck(item) {
   item.checked = item.checked ? 0 : 1;
-
   const el = document.querySelector(`#shopList .shop-item[data-id="${item.id}"]`);
   if (el) {
     el.classList.toggle('done', !!item.checked);
@@ -442,43 +543,22 @@ async function toggleShopCheck(item) {
       const firstDone = parent.querySelector('.shop-item.done');
       parent.insertBefore(el, firstDone || null);
     }
-    // Update category count header
     const catItems = listItems().filter(i => i.category === item.category);
     const hdr = parent.querySelector('.cat-hdr-count');
     if (hdr) hdr.textContent = `${catItems.filter(i=>!i.checked).length}/${catItems.length}`;
   }
-
   updateProgress();
-
-  try {
-    await api('PUT', `/api/items/${item.id}`, {checked: item.checked});
-  } catch { await loadAll(); }
+  try { await api('PUT', `/api/items/${item.id}`, {checked: item.checked}); }
+  catch { await loadAll(); }
 }
 
 async function toggleList(item) {
   item.in_list = item.in_list ? 0 : 1;
   if (item.in_list) item.checked = 0;
-  render();
-  try {
-    await api('PUT', `/api/items/${item.id}`, {in_list: item.in_list, checked: item.checked});
-  } catch { await loadAll(); }
-}
-
-async function toggleCheck(item) {
-  item.checked = item.checked ? 0 : 1;
-  render();
-  try {
-    await api('PUT', `/api/items/${item.id}`, {checked: item.checked});
-  } catch { await loadAll(); }
-}
-
-async function removeFromList(item) {
-  item.in_list = 0;
-  item.checked = 0;
-  render();
-  try {
-    await api('PUT', `/api/items/${item.id}`, {in_list: 0, checked: 0});
-  } catch { await loadAll(); }
+  renderBrowse();
+  updateCTA();
+  try { await api('PUT', `/api/items/${item.id}`, {in_list: item.in_list, checked: item.checked}); }
+  catch { await loadAll(); }
 }
 
 async function addCustom(name) {
@@ -489,52 +569,76 @@ async function addCustom(name) {
     document.getElementById('searchInput').value = '';
     searchQuery = '';
     document.getElementById('searchClear').classList.add('hidden');
-    render();
+    renderBrowse();
+    updateCTA();
     toast(`Added "${name}"`);
-    if (!isDesktop()) switchTab('list');
-  } catch (e) {
-    toast('Could not add item');
-  }
+  } catch { toast('Could not add item'); }
 }
 
-// ── Clear actions ────────────────────────────────────────────
-document.getElementById('clearDone').addEventListener('click', async () => {
-  const count = listItems().filter(i => i.checked).length;
-  if (!count) { toast('Nothing checked off yet'); return; }
-  allItems.forEach(i => { if (i.in_list && i.checked) { i.in_list = 0; i.checked = 0; } });
-  render();
-  toast(`Cleared ${count} item${count !== 1 ? 's' : ''}`);
-  await api('DELETE', '/api/items/checked');
+// ── Edit sheet
+function openEdit(item) {
+  editingItem = item;
+  document.getElementById('editId').value = item.id;
+  document.getElementById('editName').value = item.name;
+  document.getElementById('editQty').value = item.quantity || '1';
+  document.getElementById('editUnit').value = item.unit || '';
+  document.getElementById('editCat').value = item.category || 'Other';
+  document.getElementById('editNotes').value = item.notes || '';
+  openSheet('editSheet', 'editOverlay');
+}
+
+document.getElementById('editForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const payload = {
+    name:     document.getElementById('editName').value.trim(),
+    quantity: document.getElementById('editQty').value.trim() || '1',
+    unit:     document.getElementById('editUnit').value.trim(),
+    category: document.getElementById('editCat').value,
+    notes:    document.getElementById('editNotes').value.trim(),
+  };
+  if (!payload.name) return;
+  try {
+    const updated = await api('PUT', `/api/items/${editingItem.id}`, payload);
+    const idx = allItems.findIndex(i => i.id === editingItem.id);
+    if (idx !== -1) allItems[idx] = updated;
+    renderBrowse();
+    if (mode === 'reviewing') renderReview();
+    closeSheet('editSheet', 'editOverlay');
+    toast('Saved');
+  } catch { toast('Save failed'); }
 });
 
-document.getElementById('clearAll').addEventListener('click', async () => {
-  const count = listItems().length;
-  if (!count) { toast('List is already empty'); return; }
-  allItems.forEach(i => { if (i.in_list) { i.in_list = 0; i.checked = 0; } });
-  render();
-  toast('List cleared');
-  await api('DELETE', '/api/list');
-});
+// ── Sheet helpers
+function openSheet(sheetId, overlayId) {
+  document.getElementById(sheetId).classList.add('open');
+  document.getElementById(overlayId).classList.add('visible');
+  setTimeout(() => {
+    const first = document.getElementById(sheetId).querySelector('input:not([type=hidden])');
+    if (first) first.focus();
+  }, 340);
+}
 
-// ── Shopping flow ────────────────────────────────────────────
+function closeSheet(sheetId, overlayId) {
+  document.getElementById(sheetId).classList.remove('open');
+  document.getElementById(overlayId).classList.remove('visible');
+}
+
+document.getElementById('editOverlay').addEventListener('click', () => closeSheet('editSheet', 'editOverlay'));
+
+// ── Navigation events
 document.getElementById('readyBtn').addEventListener('click', () => {
-  storeSheetContext = 'start';
-  document.getElementById('storeSheetTitle').textContent = 'Shop at which store?';
-  document.querySelectorAll('.store-opt').forEach(o =>
-    o.classList.toggle('active', o.dataset.store === shoppingStore));
-  openSheet('storeSheet', 'storeOverlay');
+  if (!listItems().length) return;
+  setMode('reviewing');
 });
 
-document.getElementById('exitShop').addEventListener('click', () => {
-  setMode('building');
-});
-
-document.getElementById('finishBtn').addEventListener('click', () => {
-  setMode('done');
-});
+document.getElementById('exitReview').addEventListener('click', () => setMode('building'));
+document.getElementById('startShopBtn').addEventListener('click', () => setMode('shopping'));
+document.getElementById('exitShop').addEventListener('click', () => setMode('reviewing'));
+document.getElementById('finishBtn').addEventListener('click', () => setMode('done'));
 
 document.getElementById('btnNewList').addEventListener('click', async () => {
   allItems.forEach(i => { if (i.in_list) { i.in_list = 0; i.checked = 0; } });
+  priceCache = {};
   await api('DELETE', '/api/list');
   setMode('building');
 });
@@ -545,10 +649,9 @@ document.getElementById('btnShopAgain').addEventListener('click', async () => {
   setMode('building');
 });
 
-// ── Celebrate ────────────────────────────────────────────────
+// ── Celebrate
 function celebrate() {
   if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
-
   const colors = ['#22c55e','#fbbf24','#f87171','#60a5fa','#fb923c','#818cf8','#34d399','#fff'];
   for (let i = 0; i < 72; i++) {
     const el = document.createElement('div');
@@ -564,111 +667,17 @@ function celebrate() {
   }
 }
 
-// ── Edit sheet ───────────────────────────────────────────────
-function openEdit(item) {
-  editingItem = item;
-  document.getElementById('editId').value = item.id;
-  document.getElementById('editName').value = item.name;
-  document.getElementById('editQty').value = item.quantity || '1';
-  document.getElementById('editUnit').value = item.unit || '';
-  document.getElementById('editCat').value = item.category || 'Other';
-  document.getElementById('editNotes').value = item.notes || '';
-  document.getElementById('editStore').value = item.store || '';
-  openSheet('editSheet', 'editOverlay');
-}
-
-document.getElementById('editForm').addEventListener('submit', async e => {
-  e.preventDefault();
-  const payload = {
-    name:     document.getElementById('editName').value.trim(),
-    quantity: document.getElementById('editQty').value.trim() || '1',
-    unit:     document.getElementById('editUnit').value.trim(),
-    category: document.getElementById('editCat').value,
-    notes:    document.getElementById('editNotes').value.trim(),
-    store:    document.getElementById('editStore').value,
-  };
-  if (!payload.name) return;
-  try {
-    const updated = await api('PUT', `/api/items/${editingItem.id}`, payload);
-    const idx = allItems.findIndex(i => i.id === editingItem.id);
-    if (idx !== -1) allItems[idx] = updated;
-    render();
-    closeSheet('editSheet', 'editOverlay');
-    toast('Saved');
-  } catch { toast('Save failed'); }
-});
-
-// ── Store sheet ──────────────────────────────────────────────
-document.getElementById('storeFilterBtn').addEventListener('click', () => {
-  storeSheetContext = 'filter';
-  document.getElementById('storeSheetTitle').textContent = 'Select Store';
-  document.querySelectorAll('.store-opt').forEach(o =>
-    o.classList.toggle('active', o.dataset.store === storeFilter));
-  openSheet('storeSheet', 'storeOverlay');
-});
-
-document.getElementById('storeSheet').addEventListener('click', e => {
-  const opt = e.target.closest('.store-opt');
-  if (!opt) return;
-  const store = opt.dataset.store;
-  closeSheet('storeSheet', 'storeOverlay');
-
-  if (storeSheetContext === 'filter') {
-    storeFilter = store;
-    document.querySelectorAll('.store-opt').forEach(o =>
-      o.classList.toggle('active', o.dataset.store === storeFilter));
-    document.getElementById('storeFilterName').textContent = storeFilter === 'all' ? 'All Stores' : storeFilter;
-    document.getElementById('storeFilterBtn').classList.toggle('active', storeFilter !== 'all');
-    render();
-  } else {
-    shoppingStore = store;
-    setMode('shopping');
-  }
-});
-
-// ── Sheet helpers ────────────────────────────────────────────
-function openSheet(sheetId, overlayId) {
-  document.getElementById(sheetId).classList.add('open');
-  document.getElementById(overlayId).classList.add('visible');
-  setTimeout(() => {
-    const first = document.getElementById(sheetId).querySelector('input');
-    if (first) first.focus();
-  }, 340);
-}
-
-function closeSheet(sheetId, overlayId) {
-  document.getElementById(sheetId).classList.remove('open');
-  document.getElementById(overlayId).classList.remove('visible');
-}
-
-document.getElementById('editOverlay').addEventListener('click', () => closeSheet('editSheet', 'editOverlay'));
-document.getElementById('storeOverlay').addEventListener('click', () => closeSheet('storeSheet', 'storeOverlay'));
-
-// ── Tab switching ────────────────────────────────────────────
-function switchTab(tab) {
-  activeTab = tab;
-  document.getElementById('browseView').classList.toggle('hidden', tab !== 'browse');
-  document.getElementById('listView').classList.toggle('hidden', tab !== 'list');
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  render();
-}
-
-document.querySelector('.tab-bar').addEventListener('click', e => {
-  const tab = e.target.closest('.tab');
-  if (tab) switchTab(tab.dataset.tab);
-});
-
-// ── Category filter ──────────────────────────────────────────
+// ── Category filter
 document.getElementById('catPills').addEventListener('click', e => {
   const pill = e.target.closest('.cpill');
   if (!pill) return;
   document.querySelectorAll('.cpill').forEach(p => p.classList.remove('active'));
   pill.classList.add('active');
   browseFilter = pill.dataset.cat;
-  render();
+  renderBrowse();
 });
 
-// ── Search ───────────────────────────────────────────────────
+// ── Search
 const searchInput = document.getElementById('searchInput');
 const searchClear = document.getElementById('searchClear');
 
@@ -686,7 +695,7 @@ searchClear.addEventListener('click', () => {
   renderBrowse();
 });
 
-// ── Toast ────────────────────────────────────────────────────
+// ── Toast
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -695,22 +704,11 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-// ── Utils ────────────────────────────────────────────────────
+// ── Utils
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ── Responsive ───────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  if (mode !== 'building') return;
-  if (isDesktop()) {
-    document.getElementById('browseView').classList.remove('hidden');
-    document.getElementById('listView').classList.remove('hidden');
-  } else {
-    switchTab(activeTab);
-  }
-});
-
-// ── Boot ─────────────────────────────────────────────────────
+// ── Boot
 searchClear.classList.add('hidden');
-loadAll();
+initKrogerStatus().then(() => loadAll());
