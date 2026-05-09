@@ -9,25 +9,29 @@
 <body>
 <div class="app" id="app">
 
-  <!-- ── BUILD HEADER ─────────────────────────────────────── -->
+  <!-- ── BUILD HEADER ──────────────────────────────────────── -->
   <header class="app-bar" id="barBuild">
     <div class="bar-logo">
-      <svg viewBox="0 0 24 24"><path d="M17.21 9l-4.38-6.56c-.19-.28-.51-.44-.83-.44s-.64.16-.83.44L6.79 9H2c-.55 0-1 .45-1 1l.04.27 2.54 9.27c.23.84.99 1.46 1.92 1.46h13c.93 0 1.69-.62 1.93-1.46l2.54-9.27L22 10c0-.55-.45-1-1-1h-3.79zM12 4.8L14.8 9H9.2L12 4.8z"/></svg>
-      <span>Grocery</span>
+      <svg viewBox="0 0 24 24"><path d="M19 7h-3V6a4 4 0 0 0-8 0v1H5a1 1 0 0 0-1 1v11a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3V8a1 1 0 0 0-1-1zm-9-1a2 2 0 0 1 4 0v1h-4V6zm8 13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V9h2v1a1 1 0 0 0 2 0V9h4v1a1 1 0 0 0 2 0V9h2v10z"/></svg>
+      <span>SuperGrocery</span>
     </div>
-    <button class="bar-store-btn" id="storeFilterBtn">
-      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
-      <span id="storeFilterName">All Stores</span>
-    </button>
   </header>
 
-  <!-- ── SHOP HEADER ──────────────────────────────────────── -->
+  <!-- ── REVIEW HEADER ─────────────────────────────────────── -->
+  <header class="app-bar review-bar hidden" id="barReview">
+    <button class="bar-back" id="exitReview">
+      <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    </button>
+    <span class="bar-review-title" id="reviewTitle">Your List</span>
+    <button class="bar-start-shop" id="startShopBtn">Start Shopping</button>
+  </header>
+
+  <!-- ── SHOP HEADER ───────────────────────────────────────── -->
   <header class="app-bar shop-bar hidden" id="barShop">
     <button class="bar-back" id="exitShop">
       <svg viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
     </button>
     <div class="bar-shop-center">
-      <span class="bar-shop-store" id="shopStoreName">Shopping</span>
       <div class="bar-progress-wrap">
         <div class="bar-progress-track">
           <div class="bar-progress-fill" id="progressFill"></div>
@@ -38,86 +42,65 @@
     <button class="bar-finish" id="finishBtn">Finish</button>
   </header>
 
-  <!-- ══ BUILD MODE ══════════════════════════════════════════ -->
+  <!-- ══ BUILD MODE ════════════════════════════════════════════ -->
   <div class="mode active" id="buildMode">
-
-    <div class="tab-views">
-      <!-- Browse tab -->
-      <div class="tab-view" id="browseView">
-        <div class="search-row">
-          <div class="search-box">
-            <svg class="ic-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <input type="search" id="searchInput" placeholder="Search items…" autocomplete="off" autocorrect="off" spellcheck="false">
-            <button class="search-clear hidden" id="searchClear" aria-label="Clear">
-              <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-            </button>
-          </div>
-        </div>
-        <div class="cat-pills" id="catPills">
-          <button class="cpill active" data-cat="all">All</button>
-          <button class="cpill" data-cat="Produce">🥦 Produce</button>
-          <button class="cpill" data-cat="Dairy">🥛 Dairy</button>
-          <button class="cpill" data-cat="Meat">🥩 Meat</button>
-          <button class="cpill" data-cat="Bakery">🍞 Bakery</button>
-          <button class="cpill" data-cat="Pantry">🥫 Pantry</button>
-          <button class="cpill" data-cat="Frozen">🧊 Frozen</button>
-          <button class="cpill" data-cat="Beverages">🥤 Beverages</button>
-          <button class="cpill" data-cat="Other">📦 Other</button>
-        </div>
-        <div class="scroll-area" id="browseList"></div>
-      </div>
-
-      <!-- List tab -->
-      <div class="tab-view hidden" id="listView">
-        <div class="list-bar">
-          <span class="list-summary" id="listSummary">0 items</span>
-          <div class="list-bar-actions">
-            <button class="pill-action" id="clearDone">Clear done</button>
-            <button class="pill-action danger" id="clearAll">Clear list</button>
-          </div>
-        </div>
-        <div class="scroll-area" id="shoppingList">
-          <div class="empty-list" id="emptyList">
-            <div class="empty-emoji">🛒</div>
-            <p>Your list is empty</p>
-            <span>Browse items and tap + to add them</span>
-          </div>
-        </div>
+    <div class="search-row">
+      <div class="search-box">
+        <svg class="ic-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="search" id="searchInput" placeholder="Search items…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="search-clear hidden" id="searchClear" aria-label="Clear">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
       </div>
     </div>
-
-    <!-- Tab bar -->
-    <nav class="tab-bar">
-      <button class="tab active" data-tab="browse">
-        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-        <span>Browse</span>
-      </button>
-      <button class="tab" data-tab="list">
-        <span class="tab-icon-wrap">
-          <svg viewBox="0 0 24 24"><path d="M9 16.17L5.53 12.7a1 1 0 0 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a1 1 0 0 0-1.41-1.41L9 16.17z"/></svg>
-          <span class="badge" id="badge"></span>
-        </span>
-        <span>My List</span>
-      </button>
-    </nav>
+    <div class="cat-pills" id="catPills">
+      <button class="cpill active" data-cat="all">All</button>
+      <button class="cpill" data-cat="Produce">🥦 Produce</button>
+      <button class="cpill" data-cat="Dairy">🥛 Dairy</button>
+      <button class="cpill" data-cat="Meat">🥩 Meat</button>
+      <button class="cpill" data-cat="Bakery">🍞 Bakery</button>
+      <button class="cpill" data-cat="Pantry">🥫 Pantry</button>
+      <button class="cpill" data-cat="Frozen">🧊 Frozen</button>
+      <button class="cpill" data-cat="Beverages">🥤 Beverages</button>
+      <button class="cpill" data-cat="Other">📦 Other</button>
+    </div>
+    <div class="scroll-area" id="browseList"></div>
 
     <!-- Floating CTA -->
-    <div class="cta-float hidden" id="ctaFloat">
+    <div class="cta-float" id="ctaFloat">
       <button class="cta-btn" id="readyBtn">
-        <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96C5 16.1 5.9 17 7 17h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 23.42 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
-        Ready to Shop
+        <svg viewBox="0 0 24 24"><path d="M9 16.17L5.53 12.7a1 1 0 0 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a1 1 0 0 0-1.41-1.41L9 16.17z"/></svg>
+        Review List
         <span class="cta-count" id="ctaCount">0 items</span>
       </button>
     </div>
-
   </div>
 
-  <!-- ══ SHOP MODE ═══════════════════════════════════════════ -->
+  <!-- ══ REVIEW MODE ════════════════════════════════════════════ -->
+  <div class="mode slide-right" id="reviewMode">
+    <div class="scroll-area review-scroll" id="reviewList"></div>
+    <div class="total-bar" id="reviewTotalBar">
+      <div class="total-label">
+        Estimated total
+        <span class="total-est-note">via Kroger</span>
+      </div>
+      <span class="total-amount" id="reviewTotalAmt">—</span>
+    </div>
+  </div>
+
+  <!-- ══ SHOP MODE ══════════════════════════════════════════════ -->
   <div class="mode slide-right" id="shopMode">
     <div class="scroll-area shop-scroll" id="shopList"></div>
+    <div class="total-bar" id="shopTotalBar">
+      <div class="total-label">
+        Estimated total
+        <span class="total-est-note">via Kroger</span>
+      </div>
+      <span class="total-amount" id="shopTotalAmt">—</span>
+    </div>
   </div>
 
-  <!-- ══ DONE MODE ═══════════════════════════════════════════ -->
+  <!-- ══ DONE MODE ══════════════════════════════════════════════ -->
   <div class="mode slide-right" id="doneMode">
     <div class="done-screen">
       <div class="done-icon" id="doneIcon">🛒</div>
@@ -130,29 +113,12 @@
         </button>
         <button class="done-btn secondary" id="btnShopAgain">
           <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
-          Same List Next Trip
+          Shop Same List Again
         </button>
       </div>
     </div>
   </div>
 
-</div>
-
-<!-- ── Store picker sheet ────────────────────────────────── -->
-<div class="overlay" id="storeOverlay"></div>
-<div class="sheet" id="storeSheet">
-  <div class="sheet-handle"></div>
-  <h2 class="sheet-title" id="storeSheetTitle">Select Store</h2>
-  <div class="store-options">
-    <button class="store-opt" data-store="all">🏪 <span>All Stores</span></button>
-    <button class="store-opt" data-store="Kroger"><span class="store-logo kroger">K</span><span>Kroger</span></button>
-    <button class="store-opt" data-store="Publix"><span class="store-logo publix">P</span><span>Publix</span></button>
-    <button class="store-opt" data-store="Aldi"><span class="store-logo aldi">A</span><span>Aldi</span></button>
-    <button class="store-opt" data-store="Walmart"><span class="store-logo walmart">W</span><span>Walmart</span></button>
-    <button class="store-opt" data-store="Target"><span class="store-logo target">T</span><span>Target</span></button>
-    <button class="store-opt" data-store="Costco"><span class="store-logo costco">C</span><span>Costco</span></button>
-    <button class="store-opt" data-store="Whole Foods"><span class="store-logo wf">W</span><span>Whole Foods</span></button>
-  </div>
 </div>
 
 <!-- ── Edit sheet ──────────────────────────────────────────── -->
@@ -195,21 +161,6 @@
       <div class="form-group" style="flex:1">
         <label>Notes</label>
         <input type="text" id="editNotes" placeholder="Brand, size, preference…">
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group" style="flex:1">
-        <label>Store</label>
-        <select id="editStore">
-          <option value="">Any store</option>
-          <option value="Kroger">Kroger</option>
-          <option value="Publix">Publix</option>
-          <option value="Aldi">Aldi</option>
-          <option value="Walmart">Walmart</option>
-          <option value="Target">Target</option>
-          <option value="Costco">Costco</option>
-          <option value="Whole Foods">Whole Foods</option>
-        </select>
       </div>
     </div>
     <button type="submit" class="btn-submit">Save</button>
