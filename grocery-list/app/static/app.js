@@ -196,7 +196,19 @@ function updateCTA() {
   const n = listItems().length;
   document.getElementById('ctaCount').textContent = `${n} item${n !== 1 ? 's' : ''}`;
   document.getElementById('ctaFloat').classList.toggle('visible', n > 0 && mode === 'building');
+  document.getElementById('clearAllBtn').classList.toggle('hidden', n === 0);
 }
+
+document.getElementById('clearAllBtn').addEventListener('click', async () => {
+  const count = listItems().length;
+  if (!count) return;
+  allItems.forEach(i => { if (i.in_list) { i.in_list = 0; i.checked = 0; } });
+  priceCache = {};
+  renderBrowse();
+  updateCTA();
+  toast('List cleared');
+  await api('DELETE', '/api/list');
+});
 
 // ── Browse
 function renderBrowse() {
