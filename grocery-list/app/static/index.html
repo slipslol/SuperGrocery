@@ -7,90 +7,169 @@
   <link rel="stylesheet" href="static/style.css">
 </head>
 <body>
-  <div class="app">
+<div class="app">
 
-    <header class="header">
-      <div class="header-title">
-        <svg class="header-icon" viewBox="0 0 24 24"><path d="M17.21 9l-4.38-6.56a1 1 0 0 0-1.66 0L6.79 9H2a1 1 0 0 0-.96 1.27l2.41 9A1 1 0 0 0 4.41 20h15.18a1 1 0 0 0 .96-.73l2.41-9A1 1 0 0 0 22 9h-4.79zM12 4.44L14.6 8.5H9.4L12 4.44zM5.63 18l-1.87-7h16.48l-1.87 7H5.63z"/></svg>
-        <h1>Grocery</h1>
-        <span class="item-count" id="itemCount"></span>
-      </div>
-      <div class="header-actions">
-        <button class="btn-clear" id="clearChecked">
-          <svg viewBox="0 0 24 24"><path d="M9 16.17L5.53 12.7a.996.996 0 1 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a.996.996 0 1 0-1.41-1.41L9 16.17z"/></svg>
-          Clear done
-        </button>
-        <button class="btn-add" id="openAdd" aria-label="Add item">
-          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <div class="filter-bar" id="filterBar">
-      <button class="filter-pill active" data-cat="all">All</button>
-      <button class="filter-pill" data-cat="Produce">Produce</button>
-      <button class="filter-pill" data-cat="Dairy">Dairy</button>
-      <button class="filter-pill" data-cat="Meat">Meat</button>
-      <button class="filter-pill" data-cat="Bakery">Bakery</button>
-      <button class="filter-pill" data-cat="Pantry">Pantry</button>
-      <button class="filter-pill" data-cat="Frozen">Frozen</button>
-      <button class="filter-pill" data-cat="Beverages">Beverages</button>
-      <button class="filter-pill" data-cat="Other">Other</button>
+  <header class="header">
+    <div class="header-left">
+      <svg class="header-icon" viewBox="0 0 24 24"><path d="M17.21 9l-4.38-6.56c-.19-.28-.51-.44-.83-.44s-.64.16-.83.44L6.79 9H2c-.55 0-1 .45-1 1 0 .09.01.18.04.27l2.54 9.27c.23.84.99 1.46 1.92 1.46h13c.93 0 1.69-.62 1.93-1.46l2.54-9.27L22 10c0-.55-.45-1-1-1h-3.79zM12 4.8L14.8 9H9.2L12 4.8zM13 15h-2v2h-2v-2H7v-2h2v-2h2v2h2v2z"/></svg>
+      <h1>Grocery</h1>
     </div>
+    <button class="header-store-btn" id="storeBtn">
+      <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+      <span id="storeName">All Stores</span>
+    </button>
+  </header>
 
-    <main class="list" id="itemList">
-      <div class="empty-state" id="emptyState">
-        <div class="empty-icon">🧺</div>
+  <!-- BROWSE TAB -->
+  <div class="tab-view" id="browseView">
+    <div class="search-row">
+      <div class="search-box">
+        <svg class="ic-search" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="search" id="searchInput" placeholder="Search items…" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="search-clear" id="searchClear" aria-label="Clear">
+          <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="cat-pills" id="catPills">
+      <button class="cpill active" data-cat="all">All</button>
+      <button class="cpill" data-cat="Produce">🥦 Produce</button>
+      <button class="cpill" data-cat="Dairy">🥛 Dairy</button>
+      <button class="cpill" data-cat="Meat">🥩 Meat</button>
+      <button class="cpill" data-cat="Bakery">🍞 Bakery</button>
+      <button class="cpill" data-cat="Pantry">🥫 Pantry</button>
+      <button class="cpill" data-cat="Frozen">🧊 Frozen</button>
+      <button class="cpill" data-cat="Beverages">🥤 Beverages</button>
+      <button class="cpill" data-cat="Other">📦 Other</button>
+    </div>
+    <div class="scroll-area" id="browseList"></div>
+  </div>
+
+  <!-- LIST TAB -->
+  <div class="tab-view hidden" id="listView">
+    <div class="list-bar">
+      <span class="list-summary" id="listSummary">0 items</span>
+      <div class="list-bar-actions">
+        <button class="pill-action" id="clearDone">Clear done</button>
+        <button class="pill-action danger" id="clearAll">Clear list</button>
+      </div>
+    </div>
+    <div class="scroll-area" id="shoppingList">
+      <div class="empty-list" id="emptyList">
+        <div class="empty-emoji">🛒</div>
         <p>Your list is empty</p>
-        <span>Tap + to add items</span>
+        <span>Browse items and tap + to add them</span>
       </div>
-    </main>
-
+    </div>
   </div>
 
-  <!-- Add / Edit Sheet -->
-  <div class="sheet-overlay" id="sheetOverlay"></div>
-  <div class="sheet" id="addSheet">
-    <div class="sheet-handle"></div>
-    <h2 class="sheet-title" id="sheetTitle">Add Item</h2>
-    <form id="itemForm" autocomplete="off">
-      <input type="hidden" id="editId">
-      <div class="form-row">
-        <div class="form-group" style="flex:1">
-          <label for="itemName">Item</label>
-          <input type="text" id="itemName" placeholder="e.g. Apples" required>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group" style="flex:1">
-          <label for="itemQty">Qty</label>
-          <input type="text" id="itemQty" placeholder="1" value="1">
-        </div>
-        <div class="form-group" style="flex:1">
-          <label for="itemUnit">Unit</label>
-          <input type="text" id="itemUnit" placeholder="lb, pkg…">
-        </div>
-        <div class="form-group" style="flex:2">
-          <label for="itemCat">Category</label>
-          <select id="itemCat">
-            <option value="Produce">Produce</option>
-            <option value="Dairy">Dairy</option>
-            <option value="Meat">Meat</option>
-            <option value="Bakery">Bakery</option>
-            <option value="Pantry" selected>Pantry</option>
-            <option value="Frozen">Frozen</option>
-            <option value="Beverages">Beverages</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-      </div>
-      <button type="submit" class="btn-submit" id="submitBtn">Add to List</button>
-    </form>
+  <!-- TAB BAR -->
+  <nav class="tab-bar">
+    <button class="tab active" data-tab="browse">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <span>Browse</span>
+    </button>
+    <button class="tab" data-tab="list">
+      <span class="tab-icon-wrap">
+        <svg viewBox="0 0 24 24"><path d="M9 16.17L5.53 12.7a1 1 0 0 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a1 1 0 0 0-1.41-1.41L9 16.17z"/></svg>
+        <span class="badge" id="badge"></span>
+      </span>
+      <span>My List</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- Store picker sheet -->
+<div class="overlay" id="storeOverlay"></div>
+<div class="sheet" id="storeSheet">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title">Filter by Store</h2>
+  <div class="store-options">
+    <button class="store-opt active" data-store="all">🏪 All Stores</button>
+    <button class="store-opt" data-store="Kroger">
+      <span class="store-logo kroger">K</span> Kroger
+    </button>
+    <button class="store-opt" data-store="Publix">
+      <span class="store-logo publix">P</span> Publix
+    </button>
+    <button class="store-opt" data-store="Aldi">
+      <span class="store-logo aldi">A</span> Aldi
+    </button>
+    <button class="store-opt" data-store="Walmart">
+      <span class="store-logo walmart">W</span> Walmart
+    </button>
+    <button class="store-opt" data-store="Target">
+      <span class="store-logo target">T</span> Target
+    </button>
+    <button class="store-opt" data-store="Costco">
+      <span class="store-logo costco">C</span> Costco
+    </button>
   </div>
+</div>
 
-  <div class="toast" id="toast"></div>
+<!-- Edit sheet -->
+<div class="overlay" id="editOverlay"></div>
+<div class="sheet" id="editSheet">
+  <div class="sheet-handle"></div>
+  <h2 class="sheet-title" id="editTitle">Edit Item</h2>
+  <form id="editForm" autocomplete="off">
+    <input type="hidden" id="editId">
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Item name</label>
+        <input type="text" id="editName" required>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Qty</label>
+        <input type="text" id="editQty" placeholder="1">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Unit</label>
+        <input type="text" id="editUnit" placeholder="lb, pkg…">
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Category</label>
+        <select id="editCat">
+          <option value="Produce">Produce</option>
+          <option value="Dairy">Dairy</option>
+          <option value="Meat">Meat</option>
+          <option value="Bakery">Bakery</option>
+          <option value="Pantry" selected>Pantry</option>
+          <option value="Frozen">Frozen</option>
+          <option value="Beverages">Beverages</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Notes</label>
+        <input type="text" id="editNotes" placeholder="Brand, size, preference…">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Store</label>
+        <select id="editStore">
+          <option value="">Any store</option>
+          <option value="Kroger">Kroger</option>
+          <option value="Publix">Publix</option>
+          <option value="Aldi">Aldi</option>
+          <option value="Walmart">Walmart</option>
+          <option value="Target">Target</option>
+          <option value="Costco">Costco</option>
+        </select>
+      </div>
+    </div>
+    <button type="submit" class="btn-submit">Save</button>
+  </form>
+</div>
 
-  <script>window.HA_BASE = '__HA_BASE__';</script>
-  <script src="static/app.js"></script>
+<div class="toast" id="toast"></div>
+<script>window.HA_BASE = '__HA_BASE__';</script>
+<script src="static/app.js"></script>
 </body>
 </html>
