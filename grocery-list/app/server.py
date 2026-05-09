@@ -1,6 +1,11 @@
+import base64
+import datetime
 import json
 import os
 import sqlite3
+import time
+import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
@@ -154,7 +159,96 @@ SEED_ITEMS = [
     ("Body Wash", "1", "bottle", "Other"), ("Toothpaste", "1", "tube", "Other"),
 ]
 
+# ── Kroger API ───────────────────────────────────────────────
+_kroger_token_cache = {'token': None, 'expires_at': 0.0}
 
+
+def _load_options():
+    try:
+        with open('/data/options.json', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _get_kroger_token():
+    opts = _load_options()
+    cid  = (opts.get('kroger_client_id')     or '').strip()
+    csec = (opts.get('kroger_client_secret') or '').strip()
+    if not cid or not csec:
+        return None
+    now = time.time()
+    if _kroger_token_cache['token'] and now < _kroger_token_cache['expires_at'] - 60:
+        return _kroger_token_cache['token']
+    creds = base64.b64encode(f"{cid}:{csec}".encode()).decode()
+    req = urllib.request.Request(
+        'https://api.kroger.com/v1/connect/oauth2/token',
+        data=b'grant_type=client_credentials&scope=product.compact',
+        headers={
+            'Authorization': f'Basic {creds}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        _kroger_token_cache['token'] = data['access_token']
+        _kroger_token_cache['expires_at'] = now + data.get('expires_in', 1800)
+        return _kroger_token_cache['token']
+    except Exception as e:
+        print(f"Kroger token error: {e}")
+        return None
+
+
+def _kroger_fetch_price(name, location_id=''):
+    token = _get_kroger_token()
+    if not token:
+        return None
+    params = {'filter.term': name[:60], 'filter.limit': '3'}
+    if location_id:
+        params['filter.locationId'] = location_id[:8]
+    url = 'https://api.kroger.com/v1/products?' + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/json',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        products = data.get('data', [])
+        if not products:
+            return None
+        prod = products[0]
+
+        # Extract best price from items[]
+        price = promo = None
+        for itm in prod.get('items', []):
+            p = itm.get('price') or itm.get('nationalPrice')
+            if p and p.get('regular'):
+                price = p['regular']
+                pv = p.get('promo')
+                if pv and pv > 0 and pv < price:
+                    promo = pv
+                break
+
+        # Extract medium front image
+        img_url = ''
+        for img in prod.get('images', []):
+            if img.get('perspective') == 'front':
+                for sz in img.get('sizes', []):
+                    if sz.get('size') == 'medium':
+                        img_url = sz.get('url', '')
+                        break
+                if img_url:
+                    break
+
+        return {'price': price, 'promo': promo, 'image_url': img_url}
+    except Exception as e:
+        print(f"Kroger search error: {e}")
+        return None
+
+
+# ── Database ─────────────────────────────────────────────────
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -165,27 +259,37 @@ def init_db():
     with get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS items (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                name       TEXT    NOT NULL,
-                quantity   TEXT    NOT NULL DEFAULT '1',
-                unit       TEXT    NOT NULL DEFAULT '',
-                category   TEXT    NOT NULL DEFAULT 'Other',
-                checked    INTEGER NOT NULL DEFAULT 0,
-                in_list    INTEGER NOT NULL DEFAULT 0,
-                notes      TEXT    NOT NULL DEFAULT '',
-                store      TEXT    NOT NULL DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                name           TEXT    NOT NULL,
+                quantity       TEXT    NOT NULL DEFAULT '1',
+                unit           TEXT    NOT NULL DEFAULT '',
+                category       TEXT    NOT NULL DEFAULT 'Other',
+                checked        INTEGER NOT NULL DEFAULT 0,
+                in_list        INTEGER NOT NULL DEFAULT 0,
+                notes          TEXT    NOT NULL DEFAULT '',
+                store          TEXT    NOT NULL DEFAULT '',
+                kroger_price   REAL,
+                kroger_promo   REAL,
+                kroger_img     TEXT    NOT NULL DEFAULT '',
+                kroger_updated TEXT    NOT NULL DEFAULT '',
+                created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Migrate older DBs
         for col, defn in [
-            ("in_list", "INTEGER NOT NULL DEFAULT 0"),
-            ("notes",   "TEXT NOT NULL DEFAULT ''"),
-            ("store",   "TEXT NOT NULL DEFAULT ''"),
+            ("in_list",        "INTEGER NOT NULL DEFAULT 0"),
+            ("notes",          "TEXT NOT NULL DEFAULT ''"),
+            ("store",          "TEXT NOT NULL DEFAULT ''"),
+            ("kroger_price",   "REAL"),
+            ("kroger_promo",   "REAL"),
+            ("kroger_img",     "TEXT NOT NULL DEFAULT ''"),
+            ("kroger_updated", "TEXT NOT NULL DEFAULT ''"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE items ADD COLUMN {col} {defn}")
             except Exception:
                 pass
+
         count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         if count == 0:
             conn.executemany(
@@ -195,6 +299,7 @@ def init_db():
             print(f"Seeded {len(SEED_ITEMS)} items")
 
 
+# ── HTTP handler ─────────────────────────────────────────────
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         print(fmt % args)
@@ -221,6 +326,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urlparse(self.path).path
 
+        # ── Static files
         if path in ("/", "/index.html"):
             ingress = self.headers.get("X-Ingress-Path", "")
             with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
@@ -236,6 +342,62 @@ class Handler(BaseHTTPRequestHandler):
             self._serve_static(path[len("/static/"):])
             return
 
+        # ── Kroger status
+        if path == "/api/kroger/status":
+            opts = _load_options()
+            enabled  = bool((opts.get('kroger_client_id')     or '').strip())
+            has_loc  = bool((opts.get('kroger_location_id')   or '').strip())
+            self.send_json({'enabled': enabled, 'has_location': has_loc})
+            return
+
+        # ── Price lookup for a single item  GET /api/items/{id}/price
+        parts = path.strip("/").split("/")
+        if len(parts) == 4 and parts[0] == "api" and parts[1] == "items" and parts[3] == "price":
+            try:
+                item_id = int(parts[2])
+            except ValueError:
+                self.send_error_json(400, "invalid id")
+                return
+            with get_db() as conn:
+                row = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+            if not row:
+                self.send_error_json(404, "not found")
+                return
+            item = dict(row)
+
+            # Serve from cache if fresh (< 6 hours)
+            updated = item.get('kroger_updated', '')
+            if updated and item.get('kroger_price') is not None:
+                try:
+                    age = (datetime.datetime.utcnow() -
+                           datetime.datetime.fromisoformat(updated)).total_seconds()
+                    if age < 21600:
+                        self.send_json(item)
+                        return
+                except Exception:
+                    pass
+
+            opts   = _load_options()
+            loc    = (opts.get('kroger_location_id') or '').strip()
+            result = _kroger_fetch_price(item['name'], loc)
+            now_iso = datetime.datetime.utcnow().isoformat()
+
+            if result and result.get('price') is not None:
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE items SET kroger_price=?, kroger_promo=?, kroger_img=?, kroger_updated=? WHERE id=?",
+                        (result['price'], result['promo'], result['image_url'], now_iso, item_id),
+                    )
+                    row = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+                self.send_json(dict(row))
+            else:
+                # Mark attempted to avoid hammering the API for items with no match
+                with get_db() as conn:
+                    conn.execute("UPDATE items SET kroger_updated=? WHERE id=?", (now_iso, item_id))
+                self.send_json(item)
+            return
+
+        # ── All items
         if path == "/api/items":
             with get_db() as conn:
                 rows = conn.execute("SELECT * FROM items ORDER BY category, name").fetchall()
@@ -258,7 +420,7 @@ class Handler(BaseHTTPRequestHandler):
                      data.get("category", "Other"), 1 if data.get("in_list") else 0,
                      data.get("notes", ""), data.get("store", "")),
                 )
-                row = conn.execute("SELECT * FROM items WHERE id = ?", (cur.lastrowid,)).fetchone()
+                row = conn.execute("SELECT * FROM items WHERE id=?", (cur.lastrowid,)).fetchone()
             self.send_json(dict(row), 201)
             return
         self.send_error_json(404, "not found")
@@ -284,8 +446,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             values.append(item_id)
             with get_db() as conn:
-                conn.execute(f"UPDATE items SET {', '.join(fields)} WHERE id = ?", values)
-                row = conn.execute("SELECT * FROM items WHERE id = ?", (item_id,)).fetchone()
+                conn.execute(f"UPDATE items SET {', '.join(fields)} WHERE id=?", values)
+                row = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
             if not row:
                 self.send_error_json(404, "not found")
                 return
@@ -322,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error_json(400, "invalid id")
                 return
             with get_db() as conn:
-                conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+                conn.execute("DELETE FROM items WHERE id=?", (item_id,))
             self.send_no_content()
             return
 
