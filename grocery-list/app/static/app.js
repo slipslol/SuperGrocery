@@ -253,17 +253,10 @@ function browseRow(item) {
   el.className = 'browse-item' + (item.in_list ? ' in-list' : '');
   el.dataset.id = item.id;
 
-  const qty = qtyLabel(item);
-  const meta = [
-    qty ? `<span class="browse-qty">${esc(qty)}</span>` : '',
-    item.notes ? `<span class="browse-notes">${esc(item.notes)}</span>` : '',
-  ].filter(Boolean).join('');
-
   el.innerHTML = `
     <span class="browse-emoji">${getEmoji(item)}</span>
     <div class="browse-body">
       <div class="browse-name">${esc(item.name)}</div>
-      ${meta ? `<div class="browse-meta">${meta}</div>` : ''}
     </div>
     <div class="browse-toggle"></div>
     <button class="browse-add ${item.in_list ? 'in-list-btn' : ''}" aria-label="${item.in_list ? 'Remove' : 'Add'}">
