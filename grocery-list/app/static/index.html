@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SuperGrocery</title>
+  <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <div class="header-title">
+        <svg class="header-icon" viewBox="0 0 24 24"><path d="M17.21 9l-4.38-6.56a1 1 0 0 0-1.66 0L6.79 9H2a1 1 0 0 0-.96 1.27l2.41 9A1 1 0 0 0 4.41 20h15.18a1 1 0 0 0 .96-.73l2.41-9A1 1 0 0 0 22 9h-4.79zM12 4.44L14.6 8.5H9.4L12 4.44zM5.63 18l-1.87-7h16.48l-1.87 7H5.63z"/></svg>
+        <h1>Grocery</h1>
+        <span class="item-count" id="itemCount"></span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-clear" id="clearChecked">
+          <svg viewBox="0 0 24 24"><path d="M9 16.17L5.53 12.7a.996.996 0 1 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a.996.996 0 1 0-1.41-1.41L9 16.17z"/></svg>
+          Clear done
+        </button>
+        <button class="btn-add" id="openAdd" aria-label="Add item">
+          <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="filter-bar" id="filterBar">
+      <button class="filter-pill active" data-cat="all">All</button>
+      <button class="filter-pill" data-cat="Produce">Produce</button>
+      <button class="filter-pill" data-cat="Dairy">Dairy</button>
+      <button class="filter-pill" data-cat="Meat">Meat</button>
+      <button class="filter-pill" data-cat="Bakery">Bakery</button>
+      <button class="filter-pill" data-cat="Pantry">Pantry</button>
+      <button class="filter-pill" data-cat="Frozen">Frozen</button>
+      <button class="filter-pill" data-cat="Beverages">Beverages</button>
+      <button class="filter-pill" data-cat="Other">Other</button>
+    </div>
+
+    <main class="list" id="itemList">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🧺</div>
+        <p>Your list is empty</p>
+        <span>Tap + to add items</span>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Add / Edit Sheet -->
+  <div class="sheet-overlay" id="sheetOverlay"></div>
+  <div class="sheet" id="addSheet">
+    <div class="sheet-handle"></div>
+    <h2 class="sheet-title" id="sheetTitle">Add Item</h2>
+    <form id="itemForm" autocomplete="off">
+      <input type="hidden" id="editId">
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label for="itemName">Item</label>
+          <input type="text" id="itemName" placeholder="e.g. Apples" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label for="itemQty">Qty</label>
+          <input type="text" id="itemQty" placeholder="1" value="1">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="itemUnit">Unit</label>
+          <input type="text" id="itemUnit" placeholder="lb, pkg…">
+        </div>
+        <div class="form-group" style="flex:2">
+          <label for="itemCat">Category</label>
+          <select id="itemCat">
+            <option value="Produce">Produce</option>
+            <option value="Dairy">Dairy</option>
+            <option value="Meat">Meat</option>
+            <option value="Bakery">Bakery</option>
+            <option value="Pantry" selected>Pantry</option>
+            <option value="Frozen">Frozen</option>
+            <option value="Beverages">Beverages</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <button type="submit" class="btn-submit" id="submitBtn">Add to List</button>
+    </form>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="static/app.js"></script>
+</body>
+</html>
