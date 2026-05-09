@@ -1,5 +1,5 @@
-/* Base path works for both direct access and HA ingress */
-const BASE = window.location.pathname.replace(/\/+$/, '');
+/* HA_BASE is injected into index.html by server.py; falls back to '' locally */
+const BASE = (window.HA_BASE || '').replace(/\/+$/, '');
 
 const CAT_ORDER = ['Produce','Dairy','Meat','Bakery','Pantry','Frozen','Beverages','Other'];
 
