@@ -1,5 +1,5 @@
-/* global state injected by server.py */
-const BASE = '__INGRESS_PATH__';
+/* Base path works for both direct access and HA ingress */
+const BASE = window.location.pathname.replace(/\/+$/, '');
 
 const CAT_ORDER = ['Produce','Dairy','Meat','Bakery','Pantry','Frozen','Beverages','Other'];
 
