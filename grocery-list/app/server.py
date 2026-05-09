@@ -309,6 +309,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send_no_content()
             return
 
+        if parts == ["api", "list", "uncheck"]:
+            with get_db() as conn:
+                conn.execute("UPDATE items SET checked=0 WHERE in_list=1")
+            self.send_no_content()
+            return
+
         if len(parts) == 3 and parts[0] == "api" and parts[1] == "items":
             try:
                 item_id = int(parts[2])
