@@ -344,7 +344,14 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path in ("/", "/index.html"):
-            self._serve_static("index.html")
+            ingress_path = self.headers.get("X-Ingress-Path", "")
+            with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
+                body = f.read().replace("__HA_BASE__", ingress_path).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", len(body))
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if path.startswith("/static/"):
