@@ -168,7 +168,13 @@ def _load_options():
         with open('/data/options.json', encoding='utf-8') as f:
             return json.load(f)
     except Exception:
-        return {}
+        pass
+    # Fallback: environment variables (local development)
+    return {
+        'kroger_client_id':     os.environ.get('KROGER_CLIENT_ID', ''),
+        'kroger_client_secret': os.environ.get('KROGER_CLIENT_SECRET', ''),
+        'kroger_location_id':   os.environ.get('KROGER_LOCATION_ID', ''),
+    }
 
 
 def _get_kroger_token():
@@ -206,7 +212,7 @@ def _kroger_fetch_price(name, location_id=''):
         return None
     params = {'filter.term': name[:60], 'filter.limit': '3'}
     if location_id:
-        params['filter.locationId'] = location_id[:8]
+        params['filter.locationId'] = location_id
     url = 'https://api.kroger.com/v1/products?' + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={
         'Authorization': f'Bearer {token}',
@@ -220,15 +226,18 @@ def _kroger_fetch_price(name, location_id=''):
             return None
         prod = products[0]
 
-        # Extract best price from items[]
+        # Extract best price — prefer location price, fall back to national price
         price = promo = None
         for itm in prod.get('items', []):
-            p = itm.get('price') or itm.get('nationalPrice')
-            if p and p.get('regular'):
-                price = p['regular']
-                pv = p.get('promo')
-                if pv and pv > 0 and pv < price:
-                    promo = pv
+            for key in ('price', 'nationalPrice'):
+                p = itm.get(key)
+                if isinstance(p, dict) and p.get('regular'):
+                    price = p['regular']
+                    pv = p.get('promo')
+                    if pv and pv > 0 and pv < price:
+                        promo = pv
+                    break
+            if price is not None:
                 break
 
         # Extract medium front image
@@ -348,6 +357,43 @@ class Handler(BaseHTTPRequestHandler):
             enabled  = bool((opts.get('kroger_client_id')     or '').strip())
             has_loc  = bool((opts.get('kroger_location_id')   or '').strip())
             self.send_json({'enabled': enabled, 'has_location': has_loc})
+            return
+
+        # ── Kroger location search  GET /api/kroger/locations?zip=XXXXX
+        if path == "/api/kroger/locations":
+            qs = dict(urllib.parse.parse_qsl(urlparse(self.path).query))
+            zip_code = (qs.get('zip') or '').strip()
+            if not zip_code:
+                self.send_error_json(400, "zip required")
+                return
+            token = _get_kroger_token()
+            if not token:
+                self.send_error_json(503, "Kroger credentials not configured")
+                return
+            lurl = 'https://api.kroger.com/v1/locations?' + urllib.parse.urlencode({
+                'filter.zipCode.near': zip_code,
+                'filter.limit': '5',
+                'filter.chain': 'Kroger',
+            })
+            req = urllib.request.Request(lurl, headers={
+                'Authorization': f'Bearer {token}',
+                'Accept': 'application/json',
+            })
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read())
+                locs = []
+                for loc in data.get('data', []):
+                    addr = loc.get('address', {})
+                    locs.append({
+                        'locationId': loc.get('locationId'),
+                        'name': loc.get('name'),
+                        'address': f"{addr.get('addressLine1','')}, {addr.get('city','')}, {addr.get('state','')}",
+                    })
+                self.send_json(locs)
+            except Exception as e:
+                print(f"Kroger locations error: {e}")
+                self.send_error_json(502, f"Kroger locations error: {e}")
             return
 
         # ── Price lookup for a single item  GET /api/items/{id}/price
