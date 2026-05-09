@@ -1,6 +1,6 @@
 name: "SuperGrocery"
 description: "A sleek grocery list for Home Assistant"
-version: "1.0.3"
+version: "1.0.4"
 slug: "supergrocery"
 init: false
 arch:
@@ -12,3 +12,11 @@ panel_icon: "mdi:cart-outline"
 panel_title: "Grocery"
 homeassistant_api: false
 hassio_api: false
+options:
+  kroger_client_id: ""
+  kroger_client_secret: ""
+  kroger_location_id: ""
+schema:
+  kroger_client_id: str
+  kroger_client_secret: str
+  kroger_location_id: str
