@@ -73,6 +73,16 @@ python3 server.py
 
 ## Changelog
 
+### v1.0.4
+- New 4-step guided flow: Browse → Review → Shop → Done
+- Review step: inline qty stepper (−/+), notes editing, and estimated Kroger prices per item
+- Estimated price total shown in review and shop modes (labeled "via Kroger")
+- Kroger Products API integration — configure credentials and location ID in addon options
+- Prices are cached in the local database (6-hour TTL) to avoid repeated API calls
+- Removed store filter and store selection — pricing uses Kroger as the single source
+- Cleaner build mode: browse-only with floating "Review List" CTA
+- Bug fix: "Start New List" now reliably clears the price cache along with the list
+
 ### v1.0.3
 - Full guided shopping flow: build list → pick store → shop mode → done screen
 - Shopping mode with large tap targets, category groupings, and header progress bar
