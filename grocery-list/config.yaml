@@ -1,0 +1,14 @@
+name: "SuperGrocery"
+description: "A sleek grocery list for Home Assistant"
+version: "1.0.0"
+slug: "supergrocery"
+init: false
+arch:
+  - amd64
+  - aarch64
+ingress: true
+ingress_port: 8099
+panel_icon: "mdi:cart-outline"
+panel_title: "Grocery"
+homeassistant_api: false
+hassio_api: false
