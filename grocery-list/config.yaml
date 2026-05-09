@@ -1,6 +1,6 @@
 name: "SuperGrocery"
 description: "A sleek grocery list for Home Assistant"
-version: "1.0.0"
+version: "1.0.1"
 slug: "supergrocery"
 init: false
 arch:
