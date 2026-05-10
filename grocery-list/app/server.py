@@ -210,7 +210,10 @@ def _kroger_fetch_price(name, location_id=''):
     token = _get_kroger_token()
     if not token:
         return None
-    params = {'filter.term': name[:60], 'filter.limit': '3'}
+    # Use first 3 words for a broad, generic search (avoids over-specific matches)
+    words = name.strip().split()
+    term = ' '.join(words[:3])
+    params = {'filter.term': term, 'filter.limit': '5'}
     if location_id:
         params['filter.locationId'] = location_id
     url = 'https://api.kroger.com/v1/products?' + urllib.parse.urlencode(params)
@@ -224,34 +227,32 @@ def _kroger_fetch_price(name, location_id=''):
         products = data.get('data', [])
         if not products:
             return None
-        prod = products[0]
 
-        # Extract best price — prefer location price, fall back to national price
-        price = promo = None
-        for itm in prod.get('items', []):
-            for key in ('price', 'nationalPrice'):
-                p = itm.get(key)
-                if isinstance(p, dict) and p.get('regular'):
-                    price = p['regular']
-                    pv = p.get('promo')
-                    if pv and pv > 0 and pv < price:
-                        promo = pv
-                    break
-            if price is not None:
-                break
-
-        # Extract medium front image
-        img_url = ''
-        for img in prod.get('images', []):
-            if img.get('perspective') == 'front':
-                for sz in img.get('sizes', []):
-                    if sz.get('size') == 'medium':
-                        img_url = sz.get('url', '')
+        # Scan all returned products and pick the lowest-priced one with a valid price
+        best_price = best_promo = best_img = None
+        for prod in products:
+            for itm in prod.get('items', []):
+                for key in ('price', 'nationalPrice'):
+                    p = itm.get(key)
+                    if isinstance(p, dict) and p.get('regular'):
+                        regular = p['regular']
+                        if best_price is None or regular < best_price:
+                            best_price = regular
+                            pv = p.get('promo')
+                            best_promo = pv if pv and pv > 0 and pv < regular else None
+                            # grab image from this product
+                            best_img = ''
+                            for img in prod.get('images', []):
+                                if img.get('perspective') == 'front':
+                                    for sz in img.get('sizes', []):
+                                        if sz.get('size') == 'medium':
+                                            best_img = sz.get('url', '')
+                                            break
+                                    if best_img:
+                                        break
                         break
-                if img_url:
-                    break
 
-        return {'price': price, 'promo': promo, 'image_url': img_url}
+        return {'price': best_price, 'promo': best_promo, 'image_url': best_img or ''}
     except Exception as e:
         print(f"Kroger search error: {e}")
         return None
