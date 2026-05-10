@@ -1,6 +1,6 @@
 name: "SuperGrocery"
 description: "A sleek grocery list for Home Assistant"
-version: "1.0.6"
+version: "1.0.7"
 slug: "supergrocery"
 init: false
 arch:
@@ -8,10 +8,6 @@ arch:
   - aarch64
 ingress: true
 ingress_port: 8099
-ports:
-  8099/tcp: 8099
-ports_description:
-  8099/tcp: "SuperGrocery Web UI"
 panel_icon: "mdi:cart-outline"
 panel_title: "Grocery"
 homeassistant_api: false
