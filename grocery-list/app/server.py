@@ -359,6 +359,73 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({'enabled': enabled, 'has_location': has_loc})
             return
 
+        # ── Kroger connection test  GET /api/kroger/test
+        if path == "/api/kroger/test":
+            opts = _load_options()
+            cid  = (opts.get('kroger_client_id')     or '').strip()
+            csec = (opts.get('kroger_client_secret') or '').strip()
+            loc  = (opts.get('kroger_location_id')   or '').strip()
+            if not cid or not csec:
+                self.send_json({'step': 'config', 'ok': False,
+                                'error': 'kroger_client_id or kroger_client_secret not set in addon options'})
+                return
+            # Step 1: get token
+            creds = base64.b64encode(f"{cid}:{csec}".encode()).decode()
+            req = urllib.request.Request(
+                'https://api.kroger.com/v1/connect/oauth2/token',
+                data=b'grant_type=client_credentials&scope=product.compact',
+                headers={'Authorization': f'Basic {creds}',
+                         'Content-Type': 'application/x-www-form-urlencoded'},
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    token_data = json.loads(resp.read())
+                token = token_data.get('access_token')
+                if not token:
+                    self.send_json({'step': 'auth', 'ok': False,
+                                    'error': 'No access_token in response', 'raw': token_data})
+                    return
+            except Exception as e:
+                self.send_json({'step': 'auth', 'ok': False, 'error': str(e)})
+                return
+            # Step 2: search for a product
+            params = {'filter.term': 'Milk', 'filter.limit': '1'}
+            if loc:
+                params['filter.locationId'] = loc
+            url = 'https://api.kroger.com/v1/products?' + urllib.parse.urlencode(params)
+            req2 = urllib.request.Request(url, headers={
+                'Authorization': f'Bearer {token}', 'Accept': 'application/json'})
+            try:
+                with urllib.request.urlopen(req2, timeout=10) as resp:
+                    prod_data = json.loads(resp.read())
+                products = prod_data.get('data', [])
+                if not products:
+                    self.send_json({'step': 'search', 'ok': False,
+                                    'error': 'No products returned', 'has_location': bool(loc)})
+                    return
+                prod = products[0]
+                items = prod.get('items', [])
+                price_info = None
+                for itm in items:
+                    for key in ('price', 'nationalPrice'):
+                        p = itm.get(key)
+                        if isinstance(p, dict) and p.get('regular'):
+                            price_info = {key: p}
+                            break
+                    if price_info:
+                        break
+                self.send_json({
+                    'step': 'search', 'ok': True,
+                    'product': prod.get('description'),
+                    'has_location': bool(loc),
+                    'price_found': price_info is not None,
+                    'price_info': price_info,
+                    'raw_items': items[:1],
+                })
+            except Exception as e:
+                self.send_json({'step': 'search', 'ok': False, 'error': str(e)})
+            return
+
         # ── Kroger location search  GET /api/kroger/locations?zip=XXXXX
         if path == "/api/kroger/locations":
             qs = dict(urllib.parse.parse_qsl(urlparse(self.path).query))
