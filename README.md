@@ -73,6 +73,9 @@ python3 server.py
 
 ## Changelog
 
+### v1.0.6
+- Added direct port mapping (8099) so the addon is accessible at `http://homeassistant.local:8099` without the HA ingress proxy — enables embedding in a Lovelace `type: iframe` card without 503 errors or double-sidebar
+
 ### v1.0.5
 - **Kroger store picker in-app** — the Review screen now shows a zip code search banner when no store is configured; pick from nearby Kroger-family stores (Kroger, Ralphs, Fred Meyer, King Soopers, etc.) without touching HA config
 - Saved store location is persisted in the local database; switching stores busts the price cache so prices re-fetch at the new location
