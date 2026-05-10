@@ -81,6 +81,7 @@ let browseFilter = 'all';
 let editingItem = null;
 let toastTimer = null;
 let krogerEnabled = false;
+let krogerHasLocation = false;
 let priceCache = {}; // { [id]: {price, promo, loading, failed} }
 let priceFetchActive = false;
 
@@ -148,9 +149,11 @@ function syncPriceCacheFromItems() {
 async function initKrogerStatus() {
   try {
     const st = await api('GET', '/api/kroger/status');
-    krogerEnabled = !!(st && st.enabled);
+    krogerEnabled    = !!(st && st.enabled);
+    krogerHasLocation = !!(st && st.has_location);
   } catch {
-    krogerEnabled = false;
+    krogerEnabled    = false;
+    krogerHasLocation = false;
   }
 }
 
@@ -171,7 +174,14 @@ function setMode(newMode) {
 
   if (newMode === 'reviewing') {
     renderReview();
-    if (krogerEnabled) fetchPricesForList();
+    if (krogerEnabled) {
+      if (!krogerHasLocation) {
+        document.getElementById('krogerBanner').classList.remove('hidden');
+      } else {
+        document.getElementById('krogerBanner').classList.add('hidden');
+        fetchPricesForList();
+      }
+    }
   } else if (newMode === 'shopping') {
     renderShop();
   } else if (newMode === 'done') {
@@ -710,6 +720,63 @@ function toast(msg) {
 // ── Utils
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Kroger store picker
+document.getElementById('krogerZipBtn').addEventListener('click', searchKrogerStores);
+document.getElementById('krogerZipInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') searchKrogerStores();
+});
+
+async function searchKrogerStores() {
+  const zip = document.getElementById('krogerZipInput').value.trim();
+  if (zip.length < 5) { toast('Enter a 5-digit zip code'); return; }
+  const btn = document.getElementById('krogerZipBtn');
+  btn.textContent = '…';
+  btn.disabled = true;
+  const storesEl = document.getElementById('krogerStores');
+  try {
+    const stores = await api('GET', `/api/kroger/locations?zip=${encodeURIComponent(zip)}`);
+    storesEl.innerHTML = '';
+    if (!stores || !stores.length) {
+      storesEl.innerHTML = '<p class="kroger-no-stores">No stores found near that zip</p>';
+    } else {
+      stores.forEach(store => {
+        const item = document.createElement('div');
+        item.className = 'kroger-store-item';
+        item.innerHTML = `
+          <div class="kroger-store-info">
+            <div class="kroger-store-name">${esc(store.name)}</div>
+            <div class="kroger-store-addr">${esc(store.address)}</div>
+          </div>
+          <button class="kroger-store-select">Select</button>`;
+        item.querySelector('.kroger-store-select').addEventListener('click', () => selectKrogerStore(store));
+        storesEl.appendChild(item);
+      });
+    }
+    storesEl.classList.remove('hidden');
+  } catch (e) {
+    toast(`Store search failed: ${e.message}`);
+  } finally {
+    btn.textContent = 'Find';
+    btn.disabled = false;
+  }
+}
+
+async function selectKrogerStore(store) {
+  try {
+    await api('POST', '/api/kroger/location', {
+      location_id: store.locationId,
+      store_name: store.name,
+    });
+    krogerHasLocation = true;
+    priceCache = {};
+    document.getElementById('krogerBanner').classList.add('hidden');
+    toast(`Store set: ${store.name}`);
+    fetchPricesForList();
+  } catch {
+    toast('Could not save store');
+  }
 }
 
 // ── Boot
