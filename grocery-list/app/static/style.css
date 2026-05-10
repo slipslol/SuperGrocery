@@ -354,23 +354,6 @@ body { font-family: var(--font); color: var(--text); -webkit-font-smoothing: ant
 .browse-qty { font-size: 11px; color: var(--text-3); }
 .browse-notes { font-size: 11px; color: var(--text-3); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 
-.browse-add {
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  background: transparent;
-  border: 1.5px solid rgba(255,255,255,0.15);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: all 0.14s;
-  color: var(--text-3);
-}
-.browse-add svg { width: 16px; height: 16px; fill: currentColor; }
-.browse-item.in-list .browse-add { background: var(--primary); border-color: var(--primary); color: #fff; }
-.browse-add:hover:not(.in-list-btn) { border-color: var(--primary); color: var(--primary); }
-
 /* Add custom item row */
 .add-custom {
   display: flex;
