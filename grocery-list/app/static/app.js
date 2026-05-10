@@ -339,7 +339,6 @@ function reviewRow(item) {
         <button class="qty-btn qty-dec" type="button">−</button>
         <input class="qty-field" type="text" inputmode="decimal" value="${esc(qty)}" aria-label="Quantity">
         <button class="qty-btn qty-inc" type="button">+</button>
-        ${item.unit ? `<span class="qty-unit">${esc(item.unit)}</span>` : ''}
       </div>
       <input class="review-notes-input" type="text" placeholder="Notes (brand, size…)" value="${esc(item.notes || '')}">
     </div>`;
@@ -559,10 +558,15 @@ async function toggleShopCheck(item) {
 
 async function toggleList(item) {
   item.in_list = item.in_list ? 0 : 1;
-  if (item.in_list) item.checked = 0;
+  if (item.in_list) {
+    item.checked = 0;
+    item.quantity = '1';
+    item.unit = '';
+    item.notes = '';
+  }
   renderBrowse();
   updateCTA();
-  try { await api('PUT', `/api/items/${item.id}`, {in_list: item.in_list, checked: item.checked}); }
+  try { await api('PUT', `/api/items/${item.id}`, {in_list: item.in_list, checked: item.checked, quantity: item.quantity, unit: item.unit, notes: item.notes}); }
   catch { await loadAll(); }
 }
 
