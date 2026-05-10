@@ -17,6 +17,6 @@ options:
   kroger_client_secret: ""
   kroger_location_id: ""
 schema:
-  kroger_client_id: str
-  kroger_client_secret: str
-  kroger_location_id: str
+  kroger_client_id: str?
+  kroger_client_secret: str?
+  kroger_location_id: str?
