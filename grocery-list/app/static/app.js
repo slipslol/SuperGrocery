@@ -270,13 +270,7 @@ function browseRow(item) {
     <div class="browse-body">
       <div class="browse-name">${esc(item.name)}</div>
     </div>
-    <div class="browse-toggle"></div>
-    <button class="browse-add ${item.in_list ? 'in-list-btn' : ''}" aria-label="${item.in_list ? 'Remove' : 'Add'}">
-      <svg viewBox="0 0 24 24">${item.in_list
-        ? '<path d="M9 16.17L5.53 12.7a1 1 0 0 0-1.41 1.41l4.18 4.18c.39.39 1.02.39 1.41 0L20.29 7.71a1 1 0 0 0-1.41-1.41L9 16.17z"/>'
-        : '<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>'}
-      </svg>
-    </button>`;
+    <div class="browse-toggle"></div>`;
 
   el.addEventListener('click', () => toggleList(item));
   return el;
