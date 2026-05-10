@@ -207,10 +207,11 @@ def _get_kroger_token():
 
 
 def _kroger_fetch_price(name, location_id=''):
+    if not location_id:
+        location_id = (_get_pref('kroger_location_id') or '').strip()
     token = _get_kroger_token()
     if not token:
         return None
-    # Use first 3 words for a broad, generic search (avoids over-specific matches)
     words = name.strip().split()
     term = ' '.join(words[:3])
     params = {'filter.term': term, 'filter.limit': '5'}
@@ -265,6 +266,20 @@ def get_db():
     return conn
 
 
+def _get_pref(key):
+    try:
+        with get_db() as conn:
+            row = conn.execute("SELECT value FROM prefs WHERE key=?", (key,)).fetchone()
+        return row['value'] if row else None
+    except Exception:
+        return None
+
+
+def _set_pref(key, value):
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO prefs (key, value) VALUES (?, ?)", (key, value))
+
+
 def init_db():
     with get_db() as conn:
         conn.execute("""
@@ -299,6 +314,13 @@ def init_db():
                 conn.execute(f"ALTER TABLE items ADD COLUMN {col} {defn}")
             except Exception:
                 pass
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS prefs (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            )
+        """)
 
         count = conn.execute("SELECT COUNT(*) FROM items").fetchone()[0]
         if count == 0:
@@ -354,10 +376,26 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Kroger status
         if path == "/api/kroger/status":
-            opts = _load_options()
-            enabled  = bool((opts.get('kroger_client_id')     or '').strip())
-            has_loc  = bool((opts.get('kroger_location_id')   or '').strip())
-            self.send_json({'enabled': enabled, 'has_location': has_loc})
+            opts     = _load_options()
+            enabled  = bool((opts.get('kroger_client_id') or '').strip())
+            opts_loc = (opts.get('kroger_location_id') or '').strip()
+            pref_loc = (_get_pref('kroger_location_id') or '').strip()
+            has_loc  = bool(opts_loc or pref_loc)
+            store_name = '' if opts_loc else (_get_pref('kroger_store_name') or '')
+            self.send_json({'enabled': enabled, 'has_location': has_loc, 'store_name': store_name})
+            return
+
+        # ── Kroger saved location  GET /api/kroger/location
+        if path == "/api/kroger/location":
+            opts     = _load_options()
+            opts_loc = (opts.get('kroger_location_id') or '').strip()
+            pref_loc = (_get_pref('kroger_location_id') or '').strip()
+            store_name = '' if opts_loc else (_get_pref('kroger_store_name') or '')
+            self.send_json({
+                'location_id': opts_loc or pref_loc,
+                'store_name': store_name,
+                'source': 'options' if opts_loc else ('pref' if pref_loc else 'none'),
+            })
             return
 
         # ── Kroger connection test  GET /api/kroger/test
@@ -441,7 +479,7 @@ class Handler(BaseHTTPRequestHandler):
             lurl = 'https://api.kroger.com/v1/locations?' + urllib.parse.urlencode({
                 'filter.zipCode.near': zip_code,
                 'filter.limit': '5',
-                'filter.chain': 'Kroger',
+                'filter.radiusInMiles': '10',
             })
             req = urllib.request.Request(lurl, headers={
                 'Authorization': f'Bearer {token}',
@@ -521,6 +559,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error_json(404, "not found")
 
     def do_POST(self):
+        if urlparse(self.path).path == "/api/kroger/location":
+            data = self.read_json()
+            loc_id     = (data.get('location_id') or '').strip()
+            store_name = (data.get('store_name')  or '').strip()
+            _set_pref('kroger_location_id', loc_id)
+            _set_pref('kroger_store_name', store_name)
+            # Clear cached prices so they re-fetch with the new store's location
+            with get_db() as conn:
+                conn.execute("UPDATE items SET kroger_price=NULL, kroger_promo=NULL, kroger_updated=''")
+            self.send_json({'ok': True, 'location_id': loc_id, 'store_name': store_name})
+            return
+
         if urlparse(self.path).path == "/api/items":
             data = self.read_json()
             name = (data.get("name") or "").strip()
