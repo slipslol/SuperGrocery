@@ -79,6 +79,23 @@
 
   <!-- ══ REVIEW MODE ════════════════════════════════════════════ -->
   <div class="mode slide-right" id="reviewMode">
+
+    <!-- Kroger store picker (shown when no location set) -->
+    <div class="kroger-banner hidden" id="krogerBanner">
+      <div class="kroger-banner-head">
+        <span class="kroger-banner-icon">🏪</span>
+        <div class="kroger-banner-text">
+          <strong>Set your Kroger store for pricing</strong>
+          <span>Enter your zip code to find nearby stores</span>
+        </div>
+      </div>
+      <div class="kroger-zip-row">
+        <input type="text" id="krogerZipInput" placeholder="Zip code" maxlength="5" inputmode="numeric" pattern="[0-9]*">
+        <button class="kroger-zip-btn" id="krogerZipBtn">Find</button>
+      </div>
+      <div class="kroger-stores hidden" id="krogerStores"></div>
+    </div>
+
     <div class="scroll-area review-scroll" id="reviewList"></div>
     <div class="total-bar" id="reviewTotalBar">
       <div class="total-label">
