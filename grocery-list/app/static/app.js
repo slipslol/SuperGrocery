@@ -88,6 +88,13 @@ let priceFetchActive = false;
 // ── Derived
 const listItems = () => allItems.filter(i => i.in_list);
 
+// Keep allItems ordered the same way the backend returns them (category, then name),
+// so in-place edits/adds land in the right alphabetical slot without a reload.
+function sortItems() {
+  allItems.sort((a, b) =>
+    a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+}
+
 function visibleItems() {
   let items = allItems;
   if (browseFilter !== 'all') items = items.filter(i => i.category === browseFilter);
@@ -586,6 +593,7 @@ async function addCustom(name) {
   try {
     const item = await api('POST', '/api/items', {name, category: cat, in_list: 1});
     allItems.push(item);
+    sortItems();
     document.getElementById('searchInput').value = '';
     searchQuery = '';
     document.getElementById('searchClear').classList.add('hidden');
@@ -621,6 +629,7 @@ document.getElementById('editForm').addEventListener('submit', async e => {
     const updated = await api('PUT', `/api/items/${editingItem.id}`, payload);
     const idx = allItems.findIndex(i => i.id === editingItem.id);
     if (idx !== -1) allItems[idx] = updated;
+    sortItems();
     renderBrowse();
     if (mode === 'reviewing') renderReview();
     closeSheet('editSheet', 'editOverlay');
