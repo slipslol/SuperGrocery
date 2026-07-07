@@ -350,6 +350,23 @@ body { font-family: var(--font); color: var(--text); -webkit-font-smoothing: ant
   color: var(--text-2);
 }
 .browse-item.in-list .browse-name { color: var(--text); font-weight: 500; }
+
+.browse-edit {
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-3);
+  flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.browse-edit svg { width: 15px; height: 15px; fill: currentColor; }
+.browse-edit:hover { color: var(--primary); background: var(--primary-dim); }
 .browse-meta { display: flex; align-items: center; gap: 6px; margin-top: 1px; }
 .browse-qty { font-size: 11px; color: var(--text-3); }
 .browse-notes { font-size: 11px; color: var(--text-3); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
